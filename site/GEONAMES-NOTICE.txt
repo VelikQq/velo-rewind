@@ -1,0 +1,6 @@
+City coordinates and names: GeoNames, https://www.geonames.org/
+Source: https://download.geonames.org/export/dump/cities15000.zip
+Retrieved: 2026-10-18
+Archive SHA-256: 7d1c80d5be04850227384c1f6f9163b56401dc46270be1012e1a2de0a5bf4a70
+License: Creative Commons Attribution 4.0, https://creativecommons.org/licenses/by/4.0/
+Changes: subset of capitals, cities with population >=1,000,000, Russian cities with population >=100,000 and Russian towns within 300 km of Moscow; exclude city subdivisions. Some display names translated into Russian. Coordinates preserved. Data provided as is, without warranty.
