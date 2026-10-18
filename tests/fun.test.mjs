@@ -1,5 +1,5 @@
 import {test} from 'node:test';import assert from 'node:assert/strict';
-import {comboEquivalent,combos} from '../site/food.js';
+import {comboEquivalent,combos,foodCountLabel} from '../site/food.js';
 import {funComparisons,greatCircle,routes} from '../site/fun.js';import {summarize} from '../site/stats.js';import {csvActivities} from '../site/data.js';
 const ride=(overrides={})=>({date:'2026-06-01',distance:100000,moving:3600,elevation:1000,calories:600,type:'Ride',records:[],...overrides});
 test('great-circle reference uses city distance, not a claimed road route',()=>{assert.equal(greatCircle([0,0],[0,0]),0);assert.ok(Math.abs(greatCircle([0,0],[0,90])-10007.5434)<.001);assert.ok(routes[0].km>2400&&routes[0].km<2600);});
@@ -9,3 +9,8 @@ test('space is a cumulative height comparison and prior-year changes handle lowe
 
 test('headline comparisons are whole numbers and distinguish completed units from progress',()=>{const s=summarize([ride({distance:3889796,elevation:22233.2,moving:542107})]);const cards=funComparisons(s);for(const c of cards)assert.ok(!/\d,\d/.test(c.value),c.title);assert.equal(cards.find(c=>c.title==='Твои Эвересты').value,'2');assert.equal(cards.find(c=>c.title==='Твои Эльбрусы').value,'3');assert.equal(cards.find(c=>c.title==='Москва → Владивосток').value,'61%');assert.equal(cards.find(c=>c.title==='Сериал на колёсах').value,'225');});
 test('combo totals are the sum of their stated portions, with whole sets and nonnegative remainder',()=>{assert.equal(combos.length,4);for(const c of combos){assert.equal(c.kcal,c.items.reduce((s,item)=>s+item[1],0));const result=comboEquivalent(132227,c.kcal);assert.ok(Number.isInteger(result.count));assert.ok(result.remainder>=0&&result.remainder<c.kcal);assert.equal(comboEquivalent(0,c.kcal).count,0);assert.equal(comboEquivalent(null,c.kcal),null);}});
+
+test('pit stop counts single burgers and individual wings instead of meals',()=>{
+ const vit=combos.find(c=>c.id==='vit'),bk=combos.find(c=>c.id==='bk'),wings=combos.find(c=>c.id==='rostics');
+ assert.equal(vit.items.length,1);assert.match(vit.items[0][0],/Биг Спешиал/);assert.equal(bk.items.length,1);assert.match(bk.items[0][0],/Воппер/);assert.equal(wings.kcal,228/3);assert.equal(comboEquivalent(760,wings.kcal).count,10);assert.equal(foodCountLabel(wings,1),'крылышко');assert.equal(foodCountLabel(wings,2),'крылышка');assert.equal(foodCountLabel(wings,11),'крылышек');assert.equal(foodCountLabel(wings,21),'крылышко');assert.equal(foodCountLabel(wings,24),'крылышка');
+});
