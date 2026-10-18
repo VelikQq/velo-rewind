@@ -27,4 +27,4 @@ button.month{padding:5px 3px 3px;background:transparent;border:0;border-radius:6
 
 .activity-link{display:block;width:fit-content;color:var(--lime);font-size:14px;line-height:1.5;margin-top:8px;text-underline-offset:3px}.activity-link:focus-visible{outline:2px solid var(--lime);outline-offset:4px}.interval .activity-link{font-size:13px}
 
-.activity-value{color:inherit;text-decoration:none;cursor:pointer}.activity-value:hover{color:var(--lime)}#activity-link-status{margin-bottom:16px}
+.activity-value{color:var(--lime);text-decoration:none;cursor:pointer;white-space:nowrap}.activity-value:hover{color:#ffb47f}.strava-mark{display:inline-block;width:.55em;height:.55em;min-width:10px;min-height:10px;max-width:18px;max-height:18px;margin-left:.3em;fill:currentColor;vertical-align:baseline}#activity-link-status{margin-bottom:16px}
