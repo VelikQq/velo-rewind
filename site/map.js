@@ -1,6 +1,8 @@
 import {routeHeat,routePaths} from './geo.js';
-import {buildRouteIndex,routeTileSegments} from './route-tiles.js';
-import {routeColorField,tileColorPixels} from './route-color.js';
+import {buildRouteIndex} from './route-tiles.js';
+import {routeColorField} from './route-color.js';
+import {paintRouteTile} from './route-render.js';
+import {renderExportMap} from './map-export.js';
 let map,layer,tiles,current,expanded=false,previousOverflow="";
 function resizeMap(){setTimeout(()=>map?.invalidateSize({pan:false}),0);}
 function setExpanded(value){
@@ -37,21 +39,7 @@ export function renderRouteMap(activities){
     setTimeout(()=>{
      if(canvas._routeCancelled||!this._map)return;
      try{
-      const ctx=canvas.getContext('2d');ctx.scale(dpr,dpr);ctx.lineCap=ctx.lineJoin='round';
-      if(index){
-       const groups=routeTileSegments(index,coords,size);
-       if(groups.length){
-        // One route mask: overlapping GPS samples cannot create opaque blocks.
-        ctx.strokeStyle='#fff';ctx.lineWidth=3;ctx.beginPath();
-        for(const {segments} of groups)for(const [a,b] of segments){ctx.moveTo(...a);ctx.lineTo(...b);}ctx.stroke();
-        // Apply a continuous colour field only inside the actual GPS lines.
-        const color=tileColorPixels(field,coords,size),texture=L.DomUtil.create('canvas');
-        texture.width=texture.height=color.width;const tc=texture.getContext('2d');
-        const data=tc.createImageData(color.width,color.width);data.data.set(color.pixels);tc.putImageData(data,0,0);
-        ctx.globalCompositeOperation='source-in';ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';
-        ctx.drawImage(texture,-color.pad,-color.pad,color.extent,color.extent);ctx.globalCompositeOperation='source-over';
-       }
-      }
+      paintRouteTile(canvas,index,field,coords,{size,dpr,makeCanvas:()=>L.DomUtil.create('canvas')});
       done(null,canvas);
      }catch(error){done(error,canvas);}
     },0);
@@ -70,12 +58,13 @@ export function renderRouteMap(activities){
   document.addEventListener('fullscreenchange',()=>{if(!document.fullscreenElement&&expanded)setExpanded(false);else resizeMap();});
   document.addEventListener('keydown',e=>{if(e.key==='Escape'&&expanded){e.preventDefault();collapseMap();}});
   document.getElementById('map-fit').addEventListener('click',()=>{if(current?.bounds)map.fitBounds(current.bounds,{padding:[30,30],maxZoom:15,animate:false});});
-  document.getElementById('map-basemap').addEventListener('change',e=>{
-   if(e.target.checked){if(!tiles)tiles=L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:18,updateWhenZooming:false,attribution:'© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a>'});tiles.addTo(map);}
-   else if(tiles)map.removeLayer(tiles);
-  });
+
  }
+ if(!tiles)tiles=L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:18,updateWhenZooming:false,crossOrigin:'anonymous',attribution:'© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a>'});
+ if(!map.hasLayer(tiles))tiles.addTo(map);
  map.invalidateSize({pan:false});map.fitBounds(heat.bounds,{padding:[30,30],maxZoom:15,animate:false});
  layer.setRoutes(routePaths(activities,heat),heat);
 }
-export function clearRouteMap(){if(expanded)collapseMap();current=null;if(layer)layer.setRoutes([],{cells:[],max:0});if(map&&tiles)map.removeLayer(tiles);const checkbox=document.getElementById('map-basemap');if(checkbox)checkbox.checked=false;const info=document.getElementById('map-info');if(info)info.textContent='';}
+export function clearRouteMap(){if(expanded)collapseMap();current=null;if(layer)layer.setRoutes([],{cells:[],max:0});if(map&&tiles)map.removeLayer(tiles);const info=document.getElementById('map-info');if(info)info.textContent='';}
+
+export function exportRouteMap(width,height,options){const snapshot={heat:current,index:layer?.index,field:layer?.field};return renderExportMap(snapshot,width,height,options);}

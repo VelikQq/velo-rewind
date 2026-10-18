@@ -1,10 +1,11 @@
 const finite=Number.isFinite;
 const n=x=>Math.round(x).toLocaleString('ru-RU');
+const speed=x=>x.toLocaleString('ru-RU',{minimumFractionDigits:1,maximumFractionDigits:1});
 export function formatDuration(seconds){if(!finite(seconds))return '—';const minutes=Math.floor(Math.abs(seconds)/60),hours=Math.floor(minutes/60);return hours?`${hours} ч ${minutes%60} мин`:`${minutes} мин`;}
 export function changeLabel(current,previous,kind='number',unit=''){
  if(!finite(current)||!finite(previous))return {text:'Нет сравнения',direction:'missing'};
- const delta=current-previous;if(Math.abs(delta)<(kind==='time'?60:0.5))return {text:'Без изменений'+(delta!==0?' ≈':''),direction:'same'};
- const absolute=kind==='time'?formatDuration(delta):n(Math.abs(delta))+(unit?' '+unit:'');
+ const delta=current-previous;if(Math.abs(delta)<(kind==='time'?60:kind==='speed'?0.05:0.5))return {text:'Без изменений'+(delta!==0?' ≈':''),direction:'same'};
+ const absolute=kind==='time'?formatDuration(delta):(kind==='speed'?speed(Math.abs(delta)):n(Math.abs(delta)))+(unit?' '+unit:'');
  const sign=delta>0?'+':'−',percentage=previous>0?` · ${delta>0?'+':'−'}${n(Math.abs(delta/previous*100))}%`:'';
  return {text:sign+absolute+percentage,direction:delta>0?'up':'down'};
 }
@@ -27,6 +28,8 @@ export function comparisonRows(current,previous,options={}){
  add('Дистанции и время','Самая долгая поездка',s=>s.longestTime?.moving??null,'time');
  add('Дистанции и время','Лучшая неделя по километрам',s=>s.withDistance?Math.max(0,...s.weeks.values())/1000:null,'number','км');
  for(const km of [50,100,150,200])add('Дистанции и время',`Поездки ${km}+ км`,s=>s.withDistance?s.milestones.find(x=>x.km===km)?.count??0:null,'number','шт.');
+ add('Скорость','Максимальная скорость',s=>finite(s.maxSpeed?.maxSpeed)?s.maxSpeed.maxSpeed*3.6:null,'speed','км/ч');
+ add('Скорость','Максимальная средняя скорость',s=>finite(s.bestAverageSpeed)?s.bestAverageSpeed*3.6:null,'speed','км/ч');
  add('Мощность','Средняя мощность из сводок',s=>s.avgPower,'number','Вт');
  add('Мощность','Максимальная мощность в файлах',s=>s.maxPower?.maxPower??null,'number','Вт');
  for(const seconds of [5,60,300,1200])add('Мощность',`Лучшая мощность за ${seconds===5?'5 секунд':seconds/60+' мин'}`,s=>interval(s,seconds),'number','Вт');
@@ -36,4 +39,4 @@ export function comparisonRows(current,previous,options={}){
  const now=ftpValue(current,options.method||'manual',options.currentFTP),before=ftpValue(p,options.method||'manual',options.previousFTP);
  rows.push({group:'FTP',label:options.method==='estimate'?'Ориентир FTP: 95% лучших 20 минут':'FTP, введённый пользователем',current:now,previous:before,kind:'number',unit:'Вт',delta:changeLabel(now,before,'number','Вт')});return rows;
 }
-export function displayValue(value,kind,unit){if(!finite(value))return '—';return kind==='time'?formatDuration(value):n(value)+(unit?' '+unit:'');}
+export function displayValue(value,kind,unit){if(!finite(value))return '—';return kind==='time'?formatDuration(value):(kind==='speed'?speed(value):n(value))+(unit?' '+unit:'');}
