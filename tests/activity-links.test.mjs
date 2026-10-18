@@ -1,12 +1,12 @@
 import {test} from 'node:test';import assert from 'node:assert/strict';
-import {activityUrl,activityLink} from '../site/activity-links.js';
+import {activityUrl,activityLink,activityValue} from '../site/activity-links.js';
 import {csvActivities,mergeActivities} from '../site/data.js';
 import {summarize} from '../site/stats.js';import {comparisonRows} from '../site/compare.js';
 test('only explicit CSV Strava IDs produce safe links, not filenames, generic IDs or demo IDs',()=>{
  for(const header of ['Activity ID','ID физической активности']){const a=csvActivities(`${header},date,Filename\n123456789012,2026-05-01,987.fit`).activities[0];assert.equal(activityUrl(a),'https://www.strava.com/activities/123456789012');assert.equal(activityUrl(mergeActivities([a],[{file:'987',records:[],source:'FIT'}])[0]),activityUrl(a));}
  for(const a of [{id:'123',file:'123',source:'FIT'},{stravaId:'1',source:'DEMO'},{stravaId:'https://evil.test'},{stravaId:'1" onclick="bad'},{stravaId:'0'},{stravaId:null}])assert.equal(activityUrl(a),null);
  assert.equal(activityUrl(csvActivities('id,date\n123,2026-05-01').activities[0]),null);
- assert.match(activityLink({stravaId:'123'},'<script>'),/&lt;script&gt;/);assert.match(activityLink({stravaId:'123'}),/target="_blank" rel="noopener noreferrer"/);assert.equal(activityLink({}), '');
+ assert.match(activityLink({stravaId:'123'},'<script>'),/&lt;script&gt;/);assert.match(activityLink({stravaId:'123'}),/target="_blank" rel="noopener noreferrer"/);assert.equal(activityLink({}), '');assert.equal(activityValue({},'—'),'—');assert.match(activityValue({stravaId:'123'},'42,0'),/class="activity-value"[^>]*>42,0<\/a>/);
 });
 test('each comparison record links its actual winner in its own period, including interval and estimated FTP',()=>{
  const ride=(stravaId,date,extra={})=>({stravaId,date,distance:30000,moving:3600,maxSpeed:15,maxPower:500,maxHr:170,records:[],...extra});

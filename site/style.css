@@ -26,3 +26,5 @@ button.month{padding:5px 3px 3px;background:transparent;border:0;border-radius:6
 .share-preview{margin:0 0 35px}.share-preview canvas{display:block;width:min(100%,540px);height:auto;margin:auto;border-radius:12px;border:1px solid var(--border)}#share-status{font-size:14px;letter-spacing:0;color:var(--muted)}.map-controls{justify-content:flex-end}
 
 .activity-link{display:block;width:fit-content;color:var(--lime);font-size:14px;line-height:1.5;margin-top:8px;text-underline-offset:3px}.activity-link:focus-visible{outline:2px solid var(--lime);outline-offset:4px}.interval .activity-link{font-size:13px}
+
+.activity-value{color:var(--lime);text-decoration:underline;text-decoration-thickness:2px;text-underline-offset:5px;cursor:pointer}.activity-value:hover{color:var(--text)}#activity-link-status{margin-bottom:16px}
