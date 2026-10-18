@@ -1,0 +1,8 @@
+node_modules/
+.DS_Store
+*.fit
+*.fit.gz
+*.tcx
+*.gpx
+activities.csv
+exports/
