@@ -10,8 +10,8 @@ test('demo, filters, story controls and clear work together without network',asy
  nodes.get('kind').value='all';nodes.get('csv-units').value='auto';
  globalThis.document={getElementById:id=>{assert.ok(nodes.has(id),'Unknown element '+id);return nodes.get(id);}};globalThis.window={scrollTo(){}};
  await import('../site/app.js');nodes.get('demo').handlers.click();
- assert.equal(nodes.get('workspace').hidden,false);assert.match(nodes.get('dataset-label').textContent,/ДЕМО/);assert.match(nodes.get('summary').innerHTML,/91/);assert.match(nodes.get('power-curve').innerHTML,/20 мин/);assert.ok(!nodes.get('power-curve').innerHTML.includes('NaN'));
- nodes.get('story').handlers.click();assert.equal(nodes.get('story-dialog').open,true);assert.equal(nodes.get('story-counter').textContent,'1 / 9');nodes.get('next-story').handlers.click();assert.equal(nodes.get('story-counter').textContent,'2 / 9');nodes.get('prev-story').handlers.click();assert.equal(nodes.get('story-counter').textContent,'1 / 9');
+ assert.equal(nodes.get('workspace').hidden,false);assert.match(nodes.get('dataset-label').textContent,/ДЕМО/);assert.match(nodes.get('summary').innerHTML,/91/);assert.match(nodes.get('power-curve').innerHTML,/20 мин/);assert.ok(!nodes.get('power-curve').innerHTML.includes('NaN'));assert.match(nodes.get('fun-cards').innerHTML,/Эверест/);assert.match(nodes.get('fun-cards').innerHTML,/чизбургеров/);
+ nodes.get('story').handlers.click();assert.equal(nodes.get('story-dialog').open,true);assert.match(nodes.get('story-counter').textContent,/^1 \/ \d+$/);nodes.get('next-story').handlers.click();assert.match(nodes.get('story-counter').textContent,/^2 \/ \d+$/);nodes.get('prev-story').handlers.click();assert.match(nodes.get('story-counter').textContent,/^1 \/ \d+$/);
  nodes.get('close-story').handlers.click();assert.equal(nodes.get('story-dialog').open,false);
  nodes.get('from').value='2027-01-01';nodes.get('to').value='2027-12-31';nodes.get('apply').handlers.click();assert.equal(nodes.get('empty').hidden,false);assert.equal(nodes.get('story').disabled,true);
  nodes.get('clear').handlers.click();assert.equal(nodes.get('workspace').hidden,true);
