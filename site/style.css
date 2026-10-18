@@ -42,3 +42,7 @@ button.month{padding:5px 3px 3px;background:transparent;border:0;border-radius:6
 @media(min-width:1280px){body{padding-left:220px}}
 @media(max-width:1279px){body{padding-bottom:90px}.block-nav{top:auto;bottom:max(16px,env(safe-area-inset-bottom));left:16px;right:16px;width:auto;padding:0;border:0;background:none;box-shadow:none;flex-direction:column-reverse;gap:10px}.nav-heading{display:none}.nav-toggle{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 18px;min-height:54px;border:1px solid #76513e;background:#20232bf5;color:var(--text);border-radius:12px;box-shadow:0 8px 30px #0005;font-size:15px;cursor:pointer}.nav-links{display:none;max-height:65dvh;background:#20232b;border:1px solid var(--border);border-radius:12px;padding:10px;box-shadow:0 12px 35px #0005}.block-nav.is-open .nav-links{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}.block-nav.is-open .nav-toggle>span:last-child{transform:rotate(180deg)}.nav-links a{padding:10px;font-size:14px}.nav-links a:focus-visible{outline-offset:-3px}}
 @media(prefers-reduced-motion:reduce){.nav-links a{transition:none}}
+
+/* Hero: statistics obsession, with a code-native cycling computer illustration. */
+.intro>div:first-child{min-width:0}.intro h1{font-size:clamp(44px,4.8vw,66px);line-height:1.06;letter-spacing:-2.8px}.intro .art{max-width:480px;width:100%;justify-self:center}
+@media(max-width:640px){.intro h1{font-size:clamp(39px,9.2vw,59px);letter-spacing:-1.8px}}
