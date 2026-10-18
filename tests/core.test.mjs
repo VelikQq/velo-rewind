@@ -31,3 +31,18 @@ test('Russian Strava headers preserve identity, link originals and include summa
  const detailed={id:'example',file:'example',type:'Ride',distance:50000,power:145,hr:160,records:[{t:1,power:100}],source:'FIT'};
  const merged=mergeActivities(activities,[detailed]);assert.equal(merged.length,2);assert.equal(merged[0].distance,50800.3);assert.equal(merged[0].records.length,1);assert.equal(merged[1].records.length,0);assert.equal(merged[0].power,148);
 });
+test('Russian and English Strava speeds use m/s, preserve missing values and merge FIT fallback',()=>{
+ for(const headers of ['Макс. скорость,Средняя скорость','Max Speed,Average Speed']){
+ const {activities:a}=csvActivities(`date,Filename,${headers}\n2026-06-01,test.fit,17.28,8.116\n2026-06-02,other.fit,,`);
+ assert.equal(a[0].maxSpeed,17.28);assert.equal(a[0].avgSpeed,8.116);assert.equal(a[1].maxSpeed,null);
+ const merged=mergeActivities(a,[{file:'test',records:[],maxSpeed:19,source:'FIT'},{file:'other',records:[],maxSpeed:15,avgSpeed:8,source:'FIT'}]);
+ assert.equal(merged[0].maxSpeed,17.28);assert.equal(merged[1].maxSpeed,15);assert.equal(merged[1].avgSpeed,8);
+ }
+});
+test('FIT speed supports standard and enhanced record/session values and invalid fallback',()=>{
+ const b=new ArrayBuffer(400),v=new DataView(b);let p=14;v.setUint8(0,14);[...'.FIT'].forEach((x,i)=>v.setUint8(8+i,x.charCodeAt(0)));
+ const bytes=a=>a.forEach(x=>v.setUint8(p++,x));const u32=x=>{v.setUint32(p,x,true);p+=4;};const u16=x=>{v.setUint16(p,x,true);p+=2;};
+ bytes([0x40,0,0,20,0,3,253,4,0x86,6,2,0x84,73,4,0x86]);bytes([0]);u32(1000000000);u16(9000);u32(10000);bytes([0]);u32(1000000005);u16(12000);u32(0xffffffff);
+ bytes([0x41,0,0,18,0,4,14,2,0x84,15,2,0x84,124,4,0x86,125,4,0x86]);bytes([1]);u16(8000);u16(19000);u32(8500);u32(20000);v.setUint32(4,p-14,true);
+ const a=fitActivity(b.slice(0,p),'speeds.fit');assert.equal(a.records[0].speed,10);assert.equal(a.records[1].speed,12);assert.equal(a.maxSpeed,20);assert.equal(a.avgSpeed,8.5);
+});
