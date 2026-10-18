@@ -6,9 +6,9 @@ export function number(v) {
  return Number.isFinite(n)&&n>=0?n:null;
 }
 export function duration(v){if(v==null||v==='')return null;if(String(v).includes(':'))return String(v).split(':').reduce((a,b)=>a*60+Number(b),0);return number(v);}
-export function parseCSV(text,delimiterOverride){
+export function parseCSV(text){
  text=text.replace(/^\uFEFF/,''); const line=text.split(/\r?\n/)[0];
- const delimiter=delimiterOverride||((line.match(/;/g)||[]).length>(line.match(/,/g)||[]).length?';':',');
+ const delimiter=(line.match(/;/g)||[]).length>(line.match(/,/g)||[]).length?';':',';
  const rows=[];let row=[],cell='',quoted=false;
  for(let i=0;i<text.length;i++){const c=text[i];if(c==='"'){if(quoted&&text[i+1]==='"'){cell+='"';i++;}else quoted=!quoted;}
  else if(c===delimiter&&!quoted){row.push(cell);cell='';}
