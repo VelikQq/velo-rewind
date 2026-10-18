@@ -24,7 +24,7 @@ function render(){if(!activities.length)return;const from=$('from').value,to=$('
  stats=summarize(data);const s=stats;$('empty').hidden=s.count>0;$('results').hidden=!s.count;$('story').disabled=!s.count;$('season-title').textContent=`Сезон ${from.slice(0,4)===to.slice(0,4)?from.slice(0,4):from.slice(0,4)+'—'+to.slice(0,4)}`;if(!s.count){clearRouteMap();clearMedia();return;}
  renderRouteMap(data);renderMedia(data);
  $('summary').innerHTML=metric('ОБЩАЯ ДИСТАНЦИЯ',s.withDistance?fmt(s.distance/1000):'—','км',`${s.withDistance} из ${s.count} тренировок с дистанцией`)+metric('ВРЕМЯ В ДВИЖЕНИИ',s.withMoving?fmt(s.time/3600,1):'—','ч',`${s.withMoving} из ${s.count} тренировок со временем`)+metric('НАБОР ВЫСОТЫ',s.withElevation?fmt(s.elevation):'—','м',`${s.withElevation} из ${s.count} тренировок с набором`)+metric('ВЫЕЗДОВ ЗА СЕЗОН',fmt(s.count),'',`${fmt(s.days)} дней с тренировками`);
- const peak=maximum(s.months);$('months').innerHTML=s.months.map((x,i)=>`<div class="month" title="${monthNames[i]}: ${fmt(x,1)} км"><div class="bar ${x===peak&&x>0?'peak':''}" style="height:${peak?Math.max(1,x/peak*140):1}px"></div><span>${months[i]}</span></div>`).join('');$('peak-month').textContent=peak?`${monthNames[s.months.indexOf(peak)]} — самый километровый месяц: ${fmt(peak,1)} км.`:'Нет данных о дистанции.';
+ renderMonths(s);
  heatmap(s,from,to);$('consistency').innerHTML=mini(fmt(s.longestStreak),'дней подряд — лучшая серия')+mini(fmt(s.days),'дней с поездками');
  const record=(icon,title,a,key,unit,div=1)=>`<article class="record"><div class="record-icon">${icon}</div><h3>${title}</h3><div class="record-value">${a?fmt(a[key]/div,1):'—'} <small>${unit}</small></div><div class="record-title">${esc(a?.name||'Нет данных')}</div><div class="record-date">${date(a?.date)}</div></article>`;
  $('records').innerHTML=record('↗','САМАЯ ДЛИННАЯ',s.longest,'distance','км',1000)+record('◷','ДОЛЬШЕ ВСЕГО В ДВИЖЕНИИ',s.longestTime,'moving','ч',3600)+record('△','БОЛЬШЕ ВСЕГО ПОДЪЁМОВ',s.climbing,'elevation','м');
@@ -60,6 +60,14 @@ function appendMedia(){
  $('media-grid').insertAdjacentHTML('beforeend',html);
  $('media-more').hidden=end>=mediaItems.length;$('media-empty').hidden=mediaItems.length>0;
  $('media-more').textContent=`Показать ещё · осталось ${mediaItems.length-end}`;
+}
+function renderMonths(s,selected=null){
+ const peak=maximum(s.months);if(selected===null)selected=s.months.indexOf(peak);
+ $('months').innerHTML=s.months.map((x,i)=>`<button type="button" class="month" data-month="${i}" aria-pressed="${i===selected}" aria-controls="month-selection" aria-label="${monthNames[i]}: ${fmt(x,1)} км"><span class="bar ${x===peak&&x>0?'peak':''}" aria-hidden="true" style="height:${peak?Math.max(2,x/peak*140):2}px"></span><span>${months[i]}</span></button>`).join('');
+ const rides=s.a.filter(a=>Number(a.date.slice(5,7))-1===selected),known=rides.filter(a=>Number.isFinite(a.distance));
+ $('month-name').textContent=monthNames[selected];$('month-km').textContent=known.length?`${fmt(s.months[selected],1)} км`:rides.length?'— км':'Нет поездок';
+ $('month-note').textContent=rides.length?`${rides.length} тренировок за выбранные даты. Дистанция есть у ${known.length} из ${rides.length}.`:'В выбранном периоде нет тренировок за этот месяц.';
+ $('peak-month').textContent=peak?`${monthNames[s.months.indexOf(peak)]} — самый километровый месяц: ${fmt(peak,1)} км.`:'Нет данных о дистанции.';
 }
 function previousDate(value){const year=Number(value.slice(0,4))-1,month=Number(value.slice(5,7)),day=Number(value.slice(8,10));const last=new Date(Date.UTC(year,month,0)).getUTCDate();return `${year}-${String(month).padStart(2,'0')}-${String(Math.min(day,last)).padStart(2,'0')}`;}
 function renderFun(s,from,to,kind){const previous=activities.filter(a=>a.date>=previousDate(from)&&a.date<=previousDate(to)&&(isCycling(a.type)||$('unknown').checked&&a.type==='Unknown')).filter(a=>kind==='all'||(kind==='indoor')===/virtual|indoor|тренаж|виртуал/i.test(a.type));const baseline=summarize(previous);compareBaseline=baseline;const context=from+'|'+to+'|'+kind+'|'+$('unknown').checked;if(ftpContext!==context){$('ftp-current').value='';$('ftp-previous').value='';ftpContext=context;}renderComparison(s,baseline,from,to);funCards=funComparisons(s,baseline);$('fun-cards').innerHTML=funCards.map((c,i)=>`<article class="fun-card fun-color-${i%4}"><div class="fun-card-top"><div class="eyebrow">${esc(c.category)}</div><span class="fun-icon">${icon(c.icon)}</span></div><h3>${esc(c.title)}</h3><div class="fun-value">${esc(c.value)}</div><div class="fun-unit">${esc(c.unit)}</div>${Number.isFinite(c.progress)?`<div class="fun-progress" role="img" aria-label="Прогресс: ${c.progress}%"><i style="width:${Math.min(100,Math.max(0,c.progress))}%"></i></div>`:''}<p>${esc(c.text)}</p><details><summary>Как посчитано</summary><p>${esc(c.formula)}</p>${c.sources.map((url,i)=>`<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">Источник ${i+1} ↗</a>`).join(' · ')}</details></article>`).join('');renderFood(s);}
@@ -100,3 +108,5 @@ $('food-combos').addEventListener('change',e=>{const id=e.target?.dataset?.combo
 for(const id of ['ftp-method','ftp-current','ftp-previous'])$(id).addEventListener('change',()=>{if(stats?.count&&compareBaseline)renderComparison(stats,compareBaseline,$('from').value,$('to').value);});
 
 $('media-more').addEventListener('click',()=>{mediaLimit+=24;appendMedia();});
+
+$('months').addEventListener('click',e=>{const button=e.target.closest?.('[data-month]');if(!button||!stats)return;const month=Number(button.dataset.month);if(Number.isInteger(month)&&month>=0&&month<12)renderMonths(stats,month);});
