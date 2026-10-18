@@ -29,7 +29,8 @@ export function parseHour(value){const match=String(value).match(/(?:T|\s)(\d{1,
 export const fileKey=s=>String(s||'').replace(/\\/g,'/').split('/').pop().toLowerCase().replace(/\.(gz|fit|tcx|gpx)$/g,'').replace(/\.(fit|tcx|gpx)$/,'');
 export function csvActivities(text,units='auto'){
  const rows=parseCSV(text);if(rows.length<2)throw Error('CSV пуст или не содержит тренировок.');
- const headers=rows[0].map(x=>x.trim().toLowerCase());const inds=(...names)=>headers.map((h,i)=>names.includes(h)?i:-1).filter(i=>i>=0);
+ const aliases={'id физической активности':'activity id','дата тренировки':'activity date','название тренировки':'activity name','тип активности':'activity type','название файла':'filename','общее время':'elapsed time','расстояние':'distance','дистанция':'distance','время в движении':'moving time','набор высоты':'elevation gain','макс. пульс':'max heart rate','средний пульс':'average heart rate','макс. мощность (ватт)':'max watts','средняя мощность (ватт)':'average watts','средний каденс':'average cadence'};
+ const headers=rows[0].map(x=>{const h=x.trim().toLowerCase();return aliases[h]||h;});const inds=(...names)=>headers.map((h,i)=>names.includes(h)?i:-1).filter(i=>i>=0);
  const idx=(...names)=>inds(...names).at(-1);const at=(r,...n)=>r[idx(...n)];let skipped=0;
  const activities=rows.slice(1).map((r,i)=>{
  const date=dateKey(at(r,'activity date','date','дата занятия','дата тренировки','дата'));if(!date){skipped++;return null;}

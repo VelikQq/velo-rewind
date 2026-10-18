@@ -25,3 +25,9 @@ test('big endian FIT session summary and invalid missing values are respected',(
  [0x40,0,1,0,18,7,2,4,0x86,5,1,0,8,4,0x86,9,4,0x86,20,2,0x84,16,1,2,22,2,0x84].forEach(x=>v.setUint8(p++,x));v.setUint8(p++,0);v.setUint32(p,1000000000,false);p+=4;v.setUint8(p++,2);v.setUint32(p,3600000,false);p+=4;v.setUint32(p,4000000,false);p+=4;v.setUint16(p,220,false);p+=2;v.setUint8(p++,255);v.setUint16(p,700,false);p+=2;v.setUint32(4,p-14,true);
  const a=fitActivity(b.slice(0,p),'session.fit');assert.equal(a.distance,40000);assert.equal(a.moving,3600);assert.equal(a.power,220);assert.equal(a.hr,null);assert.equal(a.elevation,700);assert.equal(a.type,'Ride');
 });
+test('Russian Strava headers preserve identity, link originals and include summary-only rides',()=>{
+ const csv='ID физической активности,Дата тренировки,Название тренировки,Тип активности,Расстояние,Название файла,Общее время,Время в движении,Дистанция,Набор высоты,Макс. пульс,Средний пульс,Макс. мощность (Ватт),Средняя мощность (Ватт)\n42,"17 окт. 2026 г., 12:25:10",Test,Велосипед,"50,80",activities/example.fit.gz,6618,6259,50800.3,254,192,167,400,148\n43,"16 окт. 2026 г., 12:25:10",Indoor,Виртуальный заезд,30,activities/other.fit.gz,3600,3500,30000,0,180,150,350,160';
+ const {activities}=csvActivities(csv);assert.equal(activities[0].id,'42');assert.equal(activities[0].file,'example');assert.equal(activities[0].type,'Велосипед');assert.equal(activities[0].distance,50800.3);assert.equal(activities[0].power,148);assert.equal(activities[0].hr,167);assert.equal(activities[0].maxHr,192);assert.equal(activities[0].elapsed,6618);
+ const detailed={id:'example',file:'example',type:'Ride',distance:50000,power:145,hr:160,records:[{t:1,power:100}],source:'FIT'};
+ const merged=mergeActivities(activities,[detailed]);assert.equal(merged.length,2);assert.equal(merged[0].distance,50800.3);assert.equal(merged[0].records.length,1);assert.equal(merged[1].records.length,0);assert.equal(merged[0].power,148);
+});
