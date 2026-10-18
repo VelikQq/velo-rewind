@@ -5,6 +5,7 @@ export function number(v) {
  const n=Number(String(v).replace(/[\s\u00a0]/g,'').replace(',','.'));
  return Number.isFinite(n)&&n>=0?n:null;
 }
+export function bodyWeight(v){const n=number(v);return n!==null&&n>=20&&n<=300?n:null;}
 export function duration(v){if(v==null||v==='')return null;if(String(v).includes(':'))return String(v).split(':').reduce((a,b)=>a*60+Number(b),0);return number(v);}
 export function parseCSV(text){
  text=text.replace(/^\uFEFF/,''); const line=text.split(/\r?\n/)[0];
@@ -36,8 +37,9 @@ export function csvActivities(text,units='auto'){
  const activities=rows.slice(1).map((r,i)=>{
  const date=dateKey(at(r,'activity date','date','дата занятия','дата тренировки','дата'));if(!date){skipped++;return null;}
  const di=inds('distance','расстояние','дистанция');const raw=number(r[di.at(-1)]);const metric=units==='m'||(units==='auto'&&di.length>1);
+ const athleteWeight=bodyWeight(at(r,'athlete weight','athlete weight (kg)','вес спортсмена'));
  const start=at(r,'activity date','date','дата занятия','дата тренировки','дата')||'';
- return {stravaId:at(r,'activity id','идентификатор занятия')?.trim()||null,id:at(r,'activity id','id','идентификатор занятия')||`csv-${i}`,date,hour:parseHour(start),name:at(r,'activity name','name','название занятия','название')||'Велотренировка',type:at(r,'activity type','sport_type','type','тип занятия','тип тренировки')||'Unknown',distance:raw===null?null:raw*(metric?1:1000),moving:duration(at(r,'moving time','время в движении')),elapsed:duration(at(r,'elapsed time','время')),elevation:number(at(r,'elevation gain','набор высоты')),power:number(at(r,'average watts','average power','средняя мощность')),maxSpeed:number(at(r,'max speed','maximum speed','максимальная скорость')),avgSpeed:number(at(r,'average speed','средняя скорость')),maxPower:number(at(r,'max watts','max power','максимальная мощность')),hr:number(at(r,'average heart rate','average heartrate','средняя частота пульса')),maxHr:number(at(r,'max heart rate','max heartrate','максимальная частота пульса')),cadence:number(at(r,'average cadence','средний каденс')),energy:number(at(r,'total work','kilojoules','общая работа')),calories:number(at(r,'calories','калории')),file:fileKey(at(r,'filename','имя файла')),media:mediaReferences(at(r,'media','media file','media files','медиафайл','медиафайлы')),source:'CSV',records:[]};
+ return {athleteWeight,athleteWeightSource:athleteWeight!==null?'CSV':null,stravaId:at(r,'activity id','идентификатор занятия')?.trim()||null,id:at(r,'activity id','id','идентификатор занятия')||`csv-${i}`,date,hour:parseHour(start),name:at(r,'activity name','name','название занятия','название')||'Велотренировка',type:at(r,'activity type','sport_type','type','тип занятия','тип тренировки')||'Unknown',distance:raw===null?null:raw*(metric?1:1000),moving:duration(at(r,'moving time','время в движении')),elapsed:duration(at(r,'elapsed time','время')),elevation:number(at(r,'elevation gain','набор высоты')),power:number(at(r,'average watts','average power','средняя мощность')),maxSpeed:number(at(r,'max speed','maximum speed','максимальная скорость')),avgSpeed:number(at(r,'average speed','средняя скорость')),maxPower:number(at(r,'max watts','max power','максимальная мощность')),hr:number(at(r,'average heart rate','average heartrate','средняя частота пульса')),maxHr:number(at(r,'max heart rate','max heartrate','максимальная частота пульса')),cadence:number(at(r,'average cadence','средний каденс')),energy:number(at(r,'total work','kilojoules','общая работа')),calories:number(at(r,'calories','калории')),file:fileKey(at(r,'filename','имя файла')),media:mediaReferences(at(r,'media','media file','media files','медиафайл','медиафайлы')),source:'CSV',records:[]};
  }).filter(Boolean);return {activities,skipped,unitNote:units==='auto'?(inds('distance','расстояние','дистанция').length>1?'Повторные столбцы Distance: использован последний, в метрах.':'Один столбец Distance: принят за километры. При необходимости измените единицы и загрузите файл заново.'):`Расстояние в CSV: ${units==='m'?'метры':'километры'}.`};
 }
 const readText=(e,name)=>{const a=Array.from(e.getElementsByTagName('*')).find(n=>n.localName.toLowerCase()===name.toLowerCase());return a?.textContent;};
@@ -68,7 +70,7 @@ export function streamAverage(records,k){let total=0,time=0;for(let i=1;i<record
 export function fitActivity(buffer,filename){
  const v=new DataView(buffer);if(v.byteLength<14||String.fromCharCode(...new Uint8Array(buffer,8,4))!=='.FIT')throw Error('Некорректный FIT: '+filename);
  const header=v.getUint8(0),end=header+v.getUint32(4,true);if(end>v.byteLength)throw Error('Обрезанный FIT: '+filename);
- let p=header,lastTime=null;const defs={},records=[],sessions=[];
+ let p=header,lastTime=null;const defs={},records=[],sessions=[],profiles=[];
  const sizes={0:1,1:1,2:1,3:2,4:2,5:4,6:4,7:1,8:4,9:8,10:1,11:2,12:4,13:1,14:8,15:8,16:8};
  function val(pos,size,type,little){const b=type&31;let x;try{if(b===7)return new TextDecoder().decode(new Uint8Array(buffer,pos,size)).replace(/\0.*$/,'');if(size<(sizes[b]||1))return null;
  const funcs={0:'getUint8',1:'getInt8',2:'getUint8',3:'getInt16',4:'getUint16',5:'getInt32',6:'getUint32',8:'getFloat32',9:'getFloat64',10:'getUint8',11:'getUint16',12:'getUint32',13:'getUint8'};if(!funcs[b])return null;x=v[funcs[b]](pos,little);
@@ -80,14 +82,14 @@ export function fitActivity(buffer,filename){
  if(compressed){if(lastTime===null)throw Error('Нет времени для сжатой записи FIT');let t=(lastTime&~31)+(h&31);if(t<lastTime)t+=32;values[253]=t;}
  if(values[253]!=null)lastTime=values[253];
  if(def.global===20&&values[253]!=null){const x=values;records.push({t:x[253]+631065600,speed:(x[73]??x[6])!=null?(x[73]??x[6])/1000:null,power:x[7]??null,hr:x[3]??null,cadence:x[4]??null,distance:x[5]!=null?x[5]/100:null,altitude:(x[78]??x[2])!=null?(x[78]??x[2])/5-500:null,lat:x[0]!=null?x[0]*180/2147483648:null,lon:x[1]!=null?x[1]*180/2147483648:null});}
- if(def.global===18)sessions.push(values);
+ if(def.global===18)sessions.push(values);if(def.global===3)profiles.push(values);
  }
  if(sessions.length>1)throw Error('Мультиспорт FIT: разделите файл на отдельные тренировки.');
- const a=fromRecords(records,filename),s=sessions[0];if(s){const start=s[2]!=null?new Date((s[2]+631065600)*1000):null;a.date=start?.toISOString().slice(0,10)||a.date;a.hour=start?.getUTCHours()??a.hour;a.type=s[5]===2?([6,58].includes(s[6])?'VirtualRide':'Ride'):'Unknown';a.distance=s[9]!=null?s[9]/100:a.distance;a.moving=s[8]!=null?s[8]/1000:a.moving;a.elapsed=s[7]!=null?s[7]/1000:a.elapsed;a.elevation=s[22]??null;a.calories=s[11]??a.calories;a.avgSpeed=(s[124]??s[14])!=null?(s[124]??s[14])/1000:null;a.maxSpeed=(s[125]??s[15])!=null?(s[125]??s[15])/1000:a.maxSpeed;a.power=s[20]??a.power;a.maxPower=s[21]??a.maxPower;a.hr=s[16]??a.hr;a.maxHr=s[17]??a.maxHr;a.cadence=s[18]??a.cadence;}
+ const a=fromRecords(records,filename),s=sessions[0];a.athleteWeight=profiles.map(p=>p[4]!=null?bodyWeight(p[4]/10):null).filter(Number.isFinite).at(-1)??null;a.athleteWeightSource=a.athleteWeight!==null?'FIT user_profile':null;if(s){const start=s[2]!=null?new Date((s[2]+631065600)*1000):null;a.date=start?.toISOString().slice(0,10)||a.date;a.hour=start?.getUTCHours()??a.hour;a.type=s[5]===2?([6,58].includes(s[6])?'VirtualRide':'Ride'):'Unknown';a.distance=s[9]!=null?s[9]/100:a.distance;a.moving=s[8]!=null?s[8]/1000:a.moving;a.elapsed=s[7]!=null?s[7]/1000:a.elapsed;a.elevation=s[22]??null;a.calories=s[11]??a.calories;a.avgSpeed=(s[124]??s[14])!=null?(s[124]??s[14])/1000:null;a.maxSpeed=(s[125]??s[15])!=null?(s[125]??s[15])/1000:a.maxSpeed;a.power=s[20]??a.power;a.maxPower=s[21]??a.maxPower;a.hr=s[16]??a.hr;a.maxHr=s[17]??a.maxHr;a.cadence=s[18]??a.cadence;}
  if(!a.date)throw Error('В FIT не найдено время тренировки: '+filename);return a;
 }
 export function isCycling(type){return /ride|cycling|biking|вел|заезд|поездка/i.test(type);}
 export function mergeActivities(summaries,details){
- const used=new Set();const out=summaries.map(a=>{const i=details.findIndex((b,i)=>!used.has(i)&&a.file&&a.file===b.file);if(i<0)return a;used.add(i);const b=details[i],combined={...b,...a,records:b.records};for(const k of ['distance','moving','elapsed','elevation','power','hr','maxPower','maxHr','maxSpeed','avgSpeed','cadence','energy','calories'])if(combined[k]==null)combined[k]=b[k];combined.source=`CSV + ${b.source}`;return combined;});
+ const used=new Set();const out=summaries.map(a=>{const i=details.findIndex((b,i)=>!used.has(i)&&a.file&&a.file===b.file);if(i<0)return a;used.add(i);const b=details[i],combined={...b,...a,records:b.records};for(const k of ['distance','moving','elapsed','elevation','power','hr','maxPower','maxHr','maxSpeed','avgSpeed','athleteWeight','athleteWeightSource','cadence','energy','calories'])if(combined[k]==null)combined[k]=b[k];combined.source=`CSV + ${b.source}`;return combined;});
  details.forEach((a,i)=>{if(!used.has(i))out.push(a);});const keys=new Set();return out.filter(a=>{const key=a.file||a.id||`${a.date}:${a.name}`;if(keys.has(key))return false;keys.add(key);return true;});
 }

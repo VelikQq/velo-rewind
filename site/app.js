@@ -1,4 +1,6 @@
 import {activityUrl,activityValue} from './activity-links.js';
+import {suggestedWeight} from './fitness.js';
+import {fitnessMarkup} from './fitness-ui.js';
 import {cardFields,defaultCardFields} from './card-fields.js';
 import {createSharePreview} from './share-preview.js';
 import {paintShareCard} from './share-card.js';
@@ -21,7 +23,7 @@ const sharePreview=createSharePreview({
  renderMap:(onProgress,input)=>cardMap(input,onProgress),
  onState:({phase,done,total,message,input})=>{if(input)$('share-canvas').classList.toggle('transparent',input.transparent);const button=$('download');$('share-preview').hidden=phase==='empty';button.disabled=phase==='empty'||phase==='loading';button.textContent=phase==='loading'?'Готовлю карточку…':phase==='error'?'Повторить подготовку PNG ↻':'Скачать карточку PNG ↓';$('share-status').textContent=phase==='loading'?(total?`Карта: ${done} / ${total}`:'Готовлю карту…'):phase==='ready'?'Карточка готова':phase==='error'?message:'';}
 });
-let activities=[],stats=null,isDemo=false,busy=false,storyIndex=0,storyCards=[],funCards=[],comboOverrides={},compareBaseline=null,ftpContext=null;
+let activities=[],stats=null,isDemo=false,busy=false,storyIndex=0,storyCards=[],funCards=[],comboOverrides={},compareBaseline=null,ftpContext=null,fitnessContext=null,fitnessWeightManual=false;
 function status(message,error=false){$('import-status').hidden=false;$('import-status').textContent=message;$('import-status').classList.toggle('error',error);}
 function time(s){return Number.isFinite(s)?`${fmt(s/3600,1)} ч`:'—';}
 function date(s){return s?new Date(s+'T12:00:00Z').toLocaleDateString('ru-RU',{day:'numeric',month:'long',year:'numeric',timeZone:'UTC'}):'—';}
@@ -29,7 +31,7 @@ function metric(label,value,unit,note){return `<div class="stat"><div class="sta
 function mini(value,label){return `<div><div class="mini-number">${value}</div><div class="mini-label">${label}</div></div>`;}
 function maximum(a){return a.reduce((m,x)=>Math.max(m,x),0);}
 function noData(message){return `<div class="no-data">${message}</div>`;}
-function datasetLoaded(data,demo=false,files=[]){clearMedia();$('media-panel').open=false;mediaCatalog=buildMediaCatalog(files,data);ftpContext=null;activities=data;isDemo=demo;const years=[...new Set(data.map(x=>x.date?.slice(0,4)).filter(Boolean))].sort().reverse();$('year').innerHTML=years.map(y=>`<option>${esc(y)}</option>`).join('');$('workspace').hidden=false;$('unknown').checked=false;$('kind').value='all';setYear();$('dataset-label').textContent=demo?'ДЕМО · Вымышленные тренировки для знакомства с приложением':`Загружено ${fmt(data.length)} тренировок · данные только в этой вкладке`;render();$('workspace').scrollIntoView({behavior:'smooth',block:'start'});}
+function datasetLoaded(data,demo=false,files=[]){fitnessContext=null;fitnessWeightManual=false;$('fitness-weight').value='';$('fitness-scale').value='';$('fitness-ftp').value='';clearMedia();$('media-panel').open=false;mediaCatalog=buildMediaCatalog(files,data);ftpContext=null;activities=data;isDemo=demo;const years=[...new Set(data.map(x=>x.date?.slice(0,4)).filter(Boolean))].sort().reverse();$('year').innerHTML=years.map(y=>`<option>${esc(y)}</option>`).join('');$('workspace').hidden=false;$('unknown').checked=false;$('kind').value='all';setYear();$('dataset-label').textContent=demo?'ДЕМО · Вымышленные тренировки для знакомства с приложением':`Загружено ${fmt(data.length)} тренировок · данные только в этой вкладке`;render();$('workspace').scrollIntoView({behavior:'smooth',block:'start'});}
 function setYear(){const year=$('year').value,now=new Date(),today=String(now.getFullYear())+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0');$('from').value=year+'-01-01';$('to').value=year===String(now.getFullYear())?today:year+'-12-31';}
 function render(){if(!activities.length)return;sharePreview.reset();cardMapJobs=new Map();const from=$('from').value,to=$('to').value;if(!from||!to||from>to){status('Укажите корректный период: дата начала должна быть не позже даты окончания.',true);return;}
  const kind=$('kind').value;const data=activities.filter(a=>a.date>=from&&a.date<=to&&(isCycling(a.type)||$('unknown').checked&&a.type==='Unknown')).filter(a=>kind==='all'||(kind==='indoor')===/virtual|indoor|тренаж|виртуал/i.test(a.type));
@@ -51,7 +53,7 @@ function render(){if(!activities.length)return;sharePreview.reset();cardMapJobs=
  $('milestones').innerHTML=s.milestones.map(x=>`<div class="milestone"><span>Поездки ${x.km}+ км</span><b>${x.count}</b></div>`).join('');
  const coverage=(title,n)=>`<div class="coverage"><label>${title}</label><b>${n} / ${s.count}</b><div class="dist-track"><div class="dist-fill" style="width:${n/s.count*100}%"></div></div></div>`;
  $('quality').innerHTML=`<div class="quality-grid">${coverage('Сводка мощности',s.withPower)}${coverage('Сводка пульса',s.withHr)}${coverage('Ряд мощности',s.withPowerStream)}${coverage('Ряд пульса',s.withHrStream)}</div>`;
- renderFun(s,from,to,kind);
+ renderFun(s,from,to,kind);renderFitness();
  sharePreview.prepare(cardInput());
 }
 function clearMedia(){
@@ -153,3 +155,7 @@ $('media-dialog').addEventListener('close',pauseGallery);
 $('media-dialog').addEventListener('keydown',e=>{if(e.key==='ArrowRight'){e.preventDefault();showMediaGallery(mediaIndex+1);}else if(e.key==='ArrowLeft'){e.preventDefault();showMediaGallery(mediaIndex-1);}});
 $('media-prev').addEventListener('click',()=>showMediaGallery(mediaIndex-1));
 $('media-next').addEventListener('click',()=>showMediaGallery(mediaIndex+1));
+
+function renderFitness(){if(!stats?.count)return;const context=$('from').value+'|'+$('to').value+'|'+$('kind').value+'|'+$('unknown').checked;if(fitnessContext!==context){$('fitness-ftp').value='';fitnessWeightManual=false;fitnessContext=context;}const method=$('fitness-method').value||'estimate',suggestion=suggestedWeight(stats,method);if(!fitnessWeightManual)$('fitness-weight').value=suggestion?String(suggestion.value):'';$('fitness-weight-note').textContent=fitnessWeightManual?'Используется введённый вес для этого периода.':suggestion?`${suggestion.exact?'Вес из тренировки с лучшими 20 минутами':'Последний доступный вес периода'}: ${fmt(suggestion.value,1)} кг · ${suggestion.date} · ${suggestion.source}. Проверь актуальность; значение можно изменить.`:'В подходящей тренировке вес спортсмена не найден. Укажи его вручную; вес велосипеда не используется.';$('fitness-manual-label').hidden=method!=='manual';$('fitness-content').innerHTML=fitnessMarkup(stats,$('from').value,$('to').value,{weight:$('fitness-weight').value,scale:$('fitness-scale').value,method,manualFTP:$('fitness-ftp').value,demo:isDemo});}
+for(const id of ['fitness-scale','fitness-method','fitness-ftp'])$(id).addEventListener('change',renderFitness);
+$('fitness-weight').addEventListener('change',()=>{fitnessWeightManual=$('fitness-weight').value!=='';renderFitness();});
