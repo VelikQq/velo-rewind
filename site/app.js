@@ -1,4 +1,6 @@
 import {activityUrl,activityValue} from './activity-links.js';
+import {cardFields,defaultCardFields} from './card-fields.js';
+import {createSharePreview} from './share-preview.js';
 import {paintShareCard} from './share-card.js';
 import {buildMediaCatalog,seasonMedia,mediaType} from './media.js';
 import {comparisonRows,displayValue} from './compare.js';
@@ -10,8 +12,15 @@ import {csvActivities,fitActivity,xmlActivity,mergeActivities,isCycling,fileKey}
 import {summarize} from './stats.js';
 const $=id=>document.getElementById(id),fmt=(n,d=0)=>Number.isFinite(n)?n.toLocaleString('ru-RU',{maximumFractionDigits:d}):'—',esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const months=['Янв','Фев','Мар','Апр','Май','Июн','Июл','Авг','Сен','Окт','Ноя','Дек'],monthNames=['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'],days=['Пн','Вт','Ср','Чт','Пт','Сб','Вс'];
-let mediaCatalog=buildMediaCatalog([],[]),mediaItems=[],mediaLimit=24,mediaURLs=[];
-let shareVersion=0;
+let mediaCatalog=buildMediaCatalog([],[]),mediaItems=[],mediaLimit=24,mediaURLs=[],mediaRendered=0,mediaIndex=0;
+let chosenCardFields=[...defaultCardFields],cardMapJobs=new Map();
+function cardMap(input,onProgress){if(!input.showMap)return Promise.resolve(null);const jobs=cardMapJobs,key=input.transparent?'transparent':'card';if(!jobs.has(key))jobs.set(key,exportRouteMap(960,600,{onProgress,transparent:input.transparent}).catch(error=>{jobs.delete(key);throw error;}));return jobs.get(key);}
+function cardInput(){return {s:stats,from:$('from').value,to:$('to').value,demo:isDemo,transparent:$('share-style').value==='transparent',fields:[...chosenCardFields],showMap:$('card-map').checked};}
+const sharePreview=createSharePreview({
+ paint:({s,from,to,demo,transparent,fields,showMap},mapCanvas)=>paintShareCard($('share-canvas'),s,from,to,{demo,mapCanvas,transparent,fields,showMap}),
+ renderMap:(onProgress,input)=>cardMap(input,onProgress),
+ onState:({phase,done,total,message,input})=>{if(input)$('share-canvas').classList.toggle('transparent',input.transparent);const button=$('download');$('share-preview').hidden=phase==='empty';button.disabled=phase==='empty'||phase==='loading';button.textContent=phase==='loading'?'Готовлю карточку…':phase==='error'?'Повторить подготовку PNG ↻':'Скачать карточку PNG ↓';$('share-status').textContent=phase==='loading'?(total?`Карта: ${done} / ${total}`:'Готовлю карту…'):phase==='ready'?'Карточка готова':phase==='error'?message:'';}
+});
 let activities=[],stats=null,isDemo=false,busy=false,storyIndex=0,storyCards=[],funCards=[],comboOverrides={},compareBaseline=null,ftpContext=null;
 function status(message,error=false){$('import-status').hidden=false;$('import-status').textContent=message;$('import-status').classList.toggle('error',error);}
 function time(s){return Number.isFinite(s)?`${fmt(s/3600,1)} ч`:'—';}
@@ -20,9 +29,9 @@ function metric(label,value,unit,note){return `<div class="stat"><div class="sta
 function mini(value,label){return `<div><div class="mini-number">${value}</div><div class="mini-label">${label}</div></div>`;}
 function maximum(a){return a.reduce((m,x)=>Math.max(m,x),0);}
 function noData(message){return `<div class="no-data">${message}</div>`;}
-function datasetLoaded(data,demo=false,files=[]){clearMedia();mediaCatalog=buildMediaCatalog(files,data);ftpContext=null;activities=data;isDemo=demo;const years=[...new Set(data.map(x=>x.date?.slice(0,4)).filter(Boolean))].sort().reverse();$('year').innerHTML=years.map(y=>`<option>${esc(y)}</option>`).join('');$('workspace').hidden=false;$('unknown').checked=false;$('kind').value='all';setYear();$('dataset-label').textContent=demo?'ДЕМО · Вымышленные тренировки для знакомства с приложением':`Загружено ${fmt(data.length)} тренировок · данные только в этой вкладке`;render();$('workspace').scrollIntoView({behavior:'smooth',block:'start'});}
+function datasetLoaded(data,demo=false,files=[]){clearMedia();$('media-panel').open=false;mediaCatalog=buildMediaCatalog(files,data);ftpContext=null;activities=data;isDemo=demo;const years=[...new Set(data.map(x=>x.date?.slice(0,4)).filter(Boolean))].sort().reverse();$('year').innerHTML=years.map(y=>`<option>${esc(y)}</option>`).join('');$('workspace').hidden=false;$('unknown').checked=false;$('kind').value='all';setYear();$('dataset-label').textContent=demo?'ДЕМО · Вымышленные тренировки для знакомства с приложением':`Загружено ${fmt(data.length)} тренировок · данные только в этой вкладке`;render();$('workspace').scrollIntoView({behavior:'smooth',block:'start'});}
 function setYear(){const year=$('year').value,now=new Date(),today=String(now.getFullYear())+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0');$('from').value=year+'-01-01';$('to').value=year===String(now.getFullYear())?today:year+'-12-31';}
-function render(){if(!activities.length)return;shareVersion++;$('share-preview').hidden=true;const from=$('from').value,to=$('to').value;if(!from||!to||from>to){status('Укажите корректный период: дата начала должна быть не позже даты окончания.',true);return;}
+function render(){if(!activities.length)return;sharePreview.reset();cardMapJobs=new Map();const from=$('from').value,to=$('to').value;if(!from||!to||from>to){status('Укажите корректный период: дата начала должна быть не позже даты окончания.',true);return;}
  const kind=$('kind').value;const data=activities.filter(a=>a.date>=from&&a.date<=to&&(isCycling(a.type)||$('unknown').checked&&a.type==='Unknown')).filter(a=>kind==='all'||(kind==='indoor')===/virtual|indoor|тренаж|виртуал/i.test(a.type));
  stats=summarize(data);const s=stats;$('empty').hidden=s.count>0;$('results').hidden=!s.count;$('story').disabled=!s.count;$('season-title').textContent=`Сезон ${from.slice(0,4)===to.slice(0,4)?from.slice(0,4):from.slice(0,4)+'—'+to.slice(0,4)}`;if(!s.count){clearRouteMap();clearMedia();return;}
  renderRouteMap(data);renderMedia(data);const linked=data.filter(a=>activityUrl(a)).length;$('activity-link-status').textContent=isDemo?'Демо: ссылки на реальные тренировки отсутствуют.':`Ссылки на Strava доступны у ${linked} из ${data.length} тренировок. `+(linked?'':'Загрузи activities.csv из экспорта Strava вместе с исходными файлами тренировок.');
@@ -43,27 +52,33 @@ function render(){if(!activities.length)return;shareVersion++;$('share-preview')
  const coverage=(title,n)=>`<div class="coverage"><label>${title}</label><b>${n} / ${s.count}</b><div class="dist-track"><div class="dist-fill" style="width:${n/s.count*100}%"></div></div></div>`;
  $('quality').innerHTML=`<div class="quality-grid">${coverage('Сводка мощности',s.withPower)}${coverage('Сводка пульса',s.withHr)}${coverage('Ряд мощности',s.withPowerStream)}${coverage('Ряд пульса',s.withHrStream)}</div>`;
  renderFun(s,from,to,kind);
+ sharePreview.prepare(cardInput());
 }
 function clearMedia(){
+ closeMediaGallery();
  const grid=$('media-grid');if(grid){grid.querySelectorAll?.('video').forEach(video=>video.pause());grid.innerHTML='';}
- for(const url of mediaURLs)URL.revokeObjectURL(url);mediaURLs=[];mediaItems=[];mediaLimit=24;
+ for(const url of mediaURLs)if(url)URL.revokeObjectURL(url);mediaURLs=[];mediaItems=[];mediaLimit=24;mediaRendered=0;
 }
 function renderMedia(data){
  clearMedia();const result=seasonMedia(mediaCatalog,data);mediaItems=result.items;
  $('media-count').textContent=`${result.photos} фото · ${result.videos} видео · ${result.rides} тренировок`;
  $('media-note').textContent=(isDemo?'В деморежиме личных медиа нет. ':mediaItems.length?'Связано с тренировками через поле «Медиафайл» в CSV. ':'Для галереи выберите всю распакованную папку экспорта с activities.csv и папкой media. ')+(result.missing?`Не найдено или неоднозначно: ${result.missing} ссылок на медиа в выбранных поездках. `:'')+(result.unlinked?`${result.unlinked} файлов без связи с тренировками не отнесены к сезону. `:'')+'Фото и видео открываются локально. Если видео не воспроизводится, скачайте оригинал: формат или кодек может не поддерживаться браузером.';
- appendMedia();
+ if($('media-panel').open)appendMedia();else{$('media-more').hidden=true;$('media-empty').hidden=mediaItems.length>0;}
 }
+function mediaUrl(i){if(!mediaURLs[i]){const item=mediaItems[i];mediaURLs[i]=URL.createObjectURL(new Blob([item.file],{type:item.mime}));}return mediaURLs[i];}
 function appendMedia(){
- const start=mediaURLs.length,end=Math.min(mediaLimit,mediaItems.length);let html='';
+ const start=mediaRendered,end=Math.min(mediaLimit,mediaItems.length);let html='';
  for(let i=start;i<end;i++){
-  const item=mediaItems[i],blob=new Blob([item.file],{type:item.mime}),url=URL.createObjectURL(blob);mediaURLs.push(url);
-  html+=`<figure class="media-card">${item.kind==='photo'?`<a href="${url}" target="_blank" rel="noopener" aria-label="Открыть фото ${esc(item.file.name)}"><img src="${url}" loading="lazy" decoding="async" alt="${esc(item.activity.name)} · ${esc(date(item.activity.date))}"></a>`:`<video src="${url}" controls preload="none" playsinline aria-label="Видео: ${esc(item.activity.name)}"></video>`}<figcaption><span class="media-kind">${item.kind==='photo'?'Фото':'Видео'} · ${esc(date(item.activity.date))}</span><strong>${esc(item.activity.name)}</strong><a href="${url}" download="${esc(item.file.name)}">Скачать оригинал ↗</a></figcaption></figure>`;
+  const item=mediaItems[i],url=mediaUrl(i);
+  html+=`<figure class="media-card"><button type="button" class="media-open" data-media-index="${i}" aria-label="Открыть ${item.kind==='photo'?'фото':'видео'} ${esc(item.file.name)}">${item.kind==='photo'?`<img src="${url}" loading="lazy" decoding="async" alt="${esc(item.activity.name)} · ${esc(date(item.activity.date))}">`:`<video src="${url}" muted preload="metadata" playsinline aria-hidden="true"></video><span class="media-play" aria-hidden="true">▶</span>`}</button><figcaption><span class="media-kind">${item.kind==='photo'?'Фото':'Видео'} · ${esc(date(item.activity.date))}</span><strong>${esc(item.activity.name)}</strong><a href="${url}" download="${esc(item.file.name)}">Скачать оригинал ↗</a></figcaption></figure>`;
  }
- $('media-grid').insertAdjacentHTML('beforeend',html);
+ mediaRendered=end;$('media-grid').insertAdjacentHTML('beforeend',html);
  $('media-more').hidden=end>=mediaItems.length;$('media-empty').hidden=mediaItems.length>0;
  $('media-more').textContent=`Показать ещё · осталось ${mediaItems.length-end}`;
 }
+function pauseGallery(){const content=$('media-viewer-content');content.querySelectorAll?.('video').forEach(video=>video.pause());content.innerHTML='';}
+function closeMediaGallery(){pauseGallery();if($('media-dialog').open)$('media-dialog').close();}
+function showMediaGallery(index){if(!Number.isInteger(index)||index<0||index>=mediaItems.length)return;pauseGallery();mediaIndex=index;const item=mediaItems[index],url=mediaUrl(index);$('media-viewer-content').innerHTML=item.kind==='photo'?`<img src="${url}" alt="${esc(item.activity.name)}">`:`<video src="${url}" controls preload="metadata" playsinline></video>`;$('media-viewer-caption').textContent=item.activity.name+' · '+date(item.activity.date);$('media-counter').textContent=`${index+1} / ${mediaItems.length}`;$('media-prev').disabled=index===0;$('media-next').disabled=index===mediaItems.length-1;$('media-original').href=url;$('media-original').download=item.file.name;if(!$('media-dialog').open)$('media-dialog').showModal();}
 function renderMonths(s,selected=null){
  const peak=maximum(s.months);if(selected===null)selected=s.months.indexOf(peak);
  $('months').innerHTML=s.months.map((x,i)=>`<button type="button" class="month" data-month="${i}" aria-pressed="${i===selected}" aria-controls="month-selection" aria-label="${monthNames[i]}: ${fmt(x,1)} км"><span class="bar ${x===peak&&x>0?'peak':''}" aria-hidden="true" style="height:${peak?Math.max(2,x/peak*140):2}px"></span><span>${months[i]}</span></button>`).join('');
@@ -104,20 +119,16 @@ function buildStory(){const s=stats,period=$('from').value.slice(0,4)===$('to').
 function showStory(){const c=storyCards[storyIndex];$('story-progress').innerHTML=storyCards.map((_,i)=>`<i class="${i<=storyIndex?'active':''}"></i>`).join('');$('story-content').innerHTML=`<div class="story-icon">${icon(c[5]||'chart')}</div><div class="eyebrow">${c[0]}${isDemo?' · ДЕМО':''}</div><h2>${c[1]}</h2><div class="story-value">${c[2]}</div><p>${c[3]}</p>${c[4]||''}`;$('story-counter').textContent=`${storyIndex+1} / ${storyCards.length}`;$('prev-story').disabled=storyIndex===0;$('next-story').textContent=storyIndex===storyCards.length-1?'Готово ✓':'Дальше →';}
 function nextStory(){if(storyIndex===storyCards.length-1){$('story-dialog').close();return;}storyIndex++;showStory();}
 async function downloadCard(){
- if(!stats?.count||$('download').disabled)return;const ticket=++shareVersion,s=stats,from=$('from').value,to=$('to').value,demo=isDemo,c=$('share-canvas'),button=$('download');
- button.disabled=true;button.textContent='Готовлю PNG…';$('share-preview').hidden=false;$('share-preview').scrollIntoView({behavior:'auto',block:'start'});$('share-status').textContent='Готовлю карту…';
- paintShareCard(c,s,from,to,{demo});
- try{
-  const mapCanvas=await exportRouteMap(960,600,{onProgress:(done,total)=>{$('share-status').textContent=`Карта: ${done} / ${total}`;}});
-  if(ticket!==shareVersion)return;
-  paintShareCard(c,s,from,to,{demo,mapCanvas});
-  const blob=await new Promise(resolve=>c.toBlob(resolve,'image/png'));if(!blob)throw Error('Браузер не смог сохранить PNG.');if(ticket!==shareVersion)return;
-  const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='cifrodroch-'+from.slice(0,4)+'.png';a.click();setTimeout(()=>URL.revokeObjectURL(url),10000);$('share-status').textContent='PNG готов';
- }catch(error){if(ticket!==shareVersion)return;$('share-status').textContent=error.message||'Не удалось сохранить карту. Повторите попытку.';status($('share-status').textContent,true);}
- finally{button.disabled=false;button.textContent='Скачать карточку PNG ↓';}
+ const button=$('download');if(!stats?.count||button.disabled)return;
+ if(!sharePreview.ready&&!await sharePreview.prepare(cardInput()))return;
+ const ticket=sharePreview.revision,c=$('share-canvas'),from=$('from').value,transparent=$('share-style').value==='transparent';button.disabled=true;
+ try{const blob=await new Promise(resolve=>c.toBlob(resolve,'image/png'));if(ticket!==sharePreview.revision)return;if(!blob)throw Error('Браузер не смог сохранить PNG.');
+ const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='cifrodroch-'+from.slice(0,4)+(transparent?'-overlay':'')+'.png';a.click();setTimeout(()=>URL.revokeObjectURL(url),10000);$('share-status').textContent='PNG готов';
+ }catch(error){if(ticket===sharePreview.revision)$('share-status').textContent=error.message;}
+ finally{if(ticket===sharePreview.revision)button.disabled=false;}
 }
 
-$('files').addEventListener('change',e=>importFiles(e.target.files));$('folder').addEventListener('change',e=>importFiles(e.target.files));$('demo').addEventListener('click',()=>{if(busy)return;status('ДЕМО: все тренировки и показатели вымышлены. Загрузите свой экспорт, чтобы увидеть собственный сезон.');datasetLoaded(demoData(),true);});$('year').addEventListener('change',()=>{setYear();render();});$('apply').addEventListener('click',render);$('kind').addEventListener('change',render);$('unknown').addEventListener('change',render);$('clear').addEventListener('click',()=>{activities=[];stats=null;shareVersion++;$('share-preview').hidden=true;clearRouteMap();clearMedia();mediaCatalog=buildMediaCatalog([],[]);$('workspace').hidden=true;$('import-status').hidden=true;window.scrollTo({top:0,behavior:'smooth'});});$('help').addEventListener('click',()=>$('guide').scrollIntoView({behavior:'smooth'}));$('story').addEventListener('click',()=>{if(!stats?.count)return;buildStory();storyIndex=0;showStory();$('story-dialog').showModal();});$('close-story').addEventListener('click',()=>$('story-dialog').close());$('prev-story').addEventListener('click',()=>{if(storyIndex>0){storyIndex--;showStory();}});$('next-story').addEventListener('click',nextStory);$('story-dialog').addEventListener('keydown',e=>{if(e.key==='ArrowRight'){e.preventDefault();nextStory();}if(e.key==='ArrowLeft'&&storyIndex>0){e.preventDefault();storyIndex--;showStory();}});$('download').addEventListener('click',downloadCard);
+$('files').addEventListener('change',e=>importFiles(e.target.files));$('folder').addEventListener('change',e=>importFiles(e.target.files));$('demo').addEventListener('click',()=>{if(busy)return;status('ДЕМО: все тренировки и показатели вымышлены. Загрузите свой экспорт, чтобы увидеть собственный сезон.');datasetLoaded(demoData(),true);});$('year').addEventListener('change',()=>{setYear();render();});$('apply').addEventListener('click',render);$('kind').addEventListener('change',render);$('unknown').addEventListener('change',render);$('clear').addEventListener('click',()=>{activities=[];stats=null;sharePreview.reset();cardMapJobs=new Map();clearRouteMap();clearMedia();mediaCatalog=buildMediaCatalog([],[]);$('workspace').hidden=true;$('import-status').hidden=true;window.scrollTo({top:0,behavior:'smooth'});});$('help').addEventListener('click',()=>$('guide').scrollIntoView({behavior:'smooth'}));$('story').addEventListener('click',()=>{if(!stats?.count)return;buildStory();storyIndex=0;showStory();$('story-dialog').showModal();});$('close-story').addEventListener('click',()=>$('story-dialog').close());$('prev-story').addEventListener('click',()=>{if(storyIndex>0){storyIndex--;showStory();}});$('next-story').addEventListener('click',nextStory);$('story-dialog').addEventListener('keydown',e=>{if(e.key==='ArrowRight'){e.preventDefault();nextStory();}if(e.key==='ArrowLeft'&&storyIndex>0){e.preventDefault();storyIndex--;showStory();}});$('download').addEventListener('click',downloadCard);
 
 $('food-combos').addEventListener('change',e=>{const id=e.target?.dataset?.comboId;if(!combos.some(c=>c.id===id))return;const value=Number(e.target.value);if(!Number.isInteger(value)||value<1||value>50000){status('Введите целое число от 1 до 50 000 ккал на набор.',true);return;}comboOverrides[id]=value;if(stats)renderFood(stats);});
 
@@ -127,3 +138,18 @@ $('media-more').addEventListener('click',()=>{mediaLimit+=24;appendMedia();});
 
 $('months').addEventListener('click',e=>{const button=e.target.closest?.('[data-month]');if(!button||!stats)return;const month=Number(button.dataset.month);if(Number.isInteger(month)&&month>=0&&month<12)renderMonths(stats,month);});
 
+
+$('share-style').addEventListener('change',()=>{if(stats?.count)sharePreview.prepare(cardInput());});
+
+$('card-map').checked=true;
+$('card-fields').innerHTML=cardFields.map(field=>`<label><input type="checkbox" data-card-field="${field.id}" ${defaultCardFields.includes(field.id)?'checked':''}>${field.label}</label>`).join('');
+$('card-fields').addEventListener('change',e=>{const id=e.target?.dataset?.cardField;if(!cardFields.some(f=>f.id===id))return;chosenCardFields=e.target.checked?[...new Set([...chosenCardFields,id])]:chosenCardFields.filter(x=>x!==id);if(stats?.count)sharePreview.prepare(cardInput());});
+$('card-map').addEventListener('change',()=>{if(stats?.count)sharePreview.prepare(cardInput());});
+
+$('media-panel').addEventListener('toggle',()=>{if($('media-panel').open)appendMedia();else closeMediaGallery();});
+$('media-grid').addEventListener('click',e=>{const target=e.target.closest?.('[data-media-index]');if(target)showMediaGallery(Number(target.dataset.mediaIndex));});
+$('media-close').addEventListener('click',closeMediaGallery);
+$('media-dialog').addEventListener('close',pauseGallery);
+$('media-dialog').addEventListener('keydown',e=>{if(e.key==='ArrowRight'){e.preventDefault();showMediaGallery(mediaIndex+1);}else if(e.key==='ArrowLeft'){e.preventDefault();showMediaGallery(mediaIndex-1);}});
+$('media-prev').addEventListener('click',()=>showMediaGallery(mediaIndex-1));
+$('media-next').addEventListener('click',()=>showMediaGallery(mediaIndex+1));

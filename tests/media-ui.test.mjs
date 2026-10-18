@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 test('folder import renders season media, paginates and revokes URLs on filters and clear',async()=>{
  const html=readFileSync(new URL('../site/index.html',import.meta.url),'utf8'),nodes=new Map();
- for(const [,id] of html.matchAll(/\bid="([^"]+)"/g))nodes.set(id,{value:'',checked:false,hidden:false,innerHTML:'',textContent:'',handlers:{},classList:{toggle(){}},addEventListener(event,fn){this.handlers[event]=fn;},insertAdjacentHTML(where,text){this.innerHTML+=text;},scrollIntoView(){}});
+ for(const [,id] of html.matchAll(/\bid="([^"]+)"/g))nodes.set(id,{value:'',checked:false,hidden:false,innerHTML:'',textContent:'',handlers:{},classList:{toggle(){}},addEventListener(event,fn){this.handlers[event]=fn;},insertAdjacentHTML(where,text){this.innerHTML+=text;},scrollIntoView(){},showModal(){this.open=true;},close(){this.open=false;}});
  const year=nodes.get('year');Object.defineProperty(year,'innerHTML',{get(){return this.html;},set(v){this.html=v;this.value=v.match(/<option>(.*?)<\/option>/)?.[1]||'';}});
  nodes.get('csv-units').value='auto';nodes.get('ftp-method').value='estimate';
  const file=(path,content='',type='image/jpeg')=>Object.assign(new Blob([content],{type}),{name:path.split('/').pop(),webkitRelativePath:'export/'+path});
@@ -12,14 +12,19 @@ test('folder import renders season media, paginates and revokes URLs on filters 
  const csv=file('activities.csv',`Activity ID,Activity Date,Activity Type,Activity Name,Distance,Media\n1,2026-05-01,Ride,Current ride,10,${refs}\n2,2025-05-01,Ride,Old ride,20,media/old.jpg`,'text/csv');
  const create=URL.createObjectURL,revoke=URL.revokeObjectURL;let created=0,revoked=[];
  URL.createObjectURL=()=>`blob:test-${++created}`;URL.revokeObjectURL=url=>revoked.push(url);
+ nodes.get('share-canvas').getContext=()=>new Proxy({},{get:()=>()=>{},set:()=>true});
  globalThis.document={getElementById:id=>{assert.ok(nodes.has(id),id);return nodes.get(id);}};globalThis.window={scrollTo(){}};
  try{
   await import('../site/app.js');await nodes.get('folder').handlers.change({target:{files:[csv,...media]}});
   assert.match(nodes.get('activity-link-status').textContent,/1 из 1/);assert.match(nodes.get('records').innerHTML,/class="activity-value" href=/);assert.match(nodes.get('compare-rows').innerHTML,/class="activity-value" href=/);assert.match(nodes.get('records').innerHTML,/https:\/\/www\.strava\.com\/activities\/1/);assert.doesNotMatch(nodes.get('records').innerHTML,/activities\/2/);assert.match(nodes.get('compare-rows').innerHTML,/activities\/2/);
   assert.match(html, /class="button primary" for="folder"/);assert.match(html,/media-src blob:/);
-  assert.match(nodes.get('media-count').textContent,/25 фото · 1 видео/);assert.equal(created,24);assert.equal(nodes.get('media-more').hidden,false);assert.match(nodes.get('media-grid').innerHTML,/Current ride/);assert.ok(!nodes.get('media-grid').innerHTML.includes('Old ride'));
-  nodes.get('media-more').handlers.click();assert.equal(created,26);assert.equal(nodes.get('media-more').hidden,true);assert.match(nodes.get('media-grid').innerHTML,/<video[^>]*controls preload="none"/);
-  nodes.get('year').value='2025';nodes.get('year').handlers.change();assert.equal(revoked.length,26);assert.match(nodes.get('media-count').textContent,/1 фото · 0 видео/);assert.match(nodes.get('media-grid').innerHTML,/Old ride/);
+  assert.match(nodes.get('media-count').textContent,/25 фото · 1 видео/);assert.equal(created,0);assert.doesNotMatch(html,/<details id="media-panel"[^>]*\bopen/);nodes.get('media-panel').open=true;nodes.get('media-panel').handlers.toggle();assert.equal(created,24);assert.equal(nodes.get('media-more').hidden,false);assert.match(nodes.get('media-grid').innerHTML,/Current ride/);assert.ok(!nodes.get('media-grid').innerHTML.includes('Old ride'));
+  nodes.get('media-more').handlers.click();assert.equal(created,26);assert.equal(nodes.get('media-more').hidden,true);assert.match(nodes.get('media-grid').innerHTML,/<video[^>]*muted preload="metadata"/);
+  assert.doesNotMatch(nodes.get('media-grid').innerHTML,/target="_blank"/);
+  nodes.get('media-grid').handlers.click({target:{closest:()=>({dataset:{mediaIndex:'0'}})}});assert.equal(nodes.get('media-dialog').open,true);assert.equal(nodes.get('media-counter').textContent,'1 / 26');assert.match(nodes.get('media-viewer-content').innerHTML,/<img/);
+  nodes.get('media-next').handlers.click();assert.equal(nodes.get('media-counter').textContent,'2 / 26');nodes.get('media-dialog').handlers.keydown({key:'ArrowLeft',preventDefault(){}});assert.equal(nodes.get('media-counter').textContent,'1 / 26');
+  nodes.get('media-grid').handlers.click({target:{closest:()=>({dataset:{mediaIndex:'25'}})}});assert.match(nodes.get('media-viewer-content').innerHTML,/<video[^>]*controls/);assert.equal(nodes.get('media-next').disabled,true);
+  nodes.get('year').value='2025';nodes.get('year').handlers.change();assert.equal(revoked.length,26);assert.equal(nodes.get('media-dialog').open,false);assert.equal(nodes.get('media-viewer-content').innerHTML,'');assert.match(nodes.get('media-count').textContent,/1 фото · 0 видео/);assert.match(nodes.get('media-grid').innerHTML,/Old ride/);
   nodes.get('clear').handlers.click();assert.equal(revoked.length,27);assert.equal(nodes.get('media-grid').innerHTML,'');
  }finally{URL.createObjectURL=create;URL.revokeObjectURL=revoke;delete globalThis.document;delete globalThis.window;}
 });

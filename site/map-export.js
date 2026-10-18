@@ -11,16 +11,16 @@ export function loadMapImage(url){return new Promise((resolve,reject)=>{
  const img=new Image(),timer=setTimeout(()=>{img.onload=img.onerror=null;reject(Error('Карта не ответила вовремя. Проверьте сеть и повторите скачивание.'));},12000);
  img.crossOrigin='anonymous';img.onload=()=>{clearTimeout(timer);resolve(img);};img.onerror=()=>{clearTimeout(timer);reject(Error('Не удалось загрузить подложку карты. Проверьте сеть и повторите скачивание.'));};img.src=url;
 });}
-export async function renderExportMap({heat,index,field},width,height,{makeCanvas=()=>document.createElement('canvas'),loadImage=loadMapImage,onProgress=()=>{}}={}){
+export async function renderExportMap({heat,index,field},width,height,{makeCanvas=()=>document.createElement('canvas'),loadImage=loadMapImage,onProgress=()=>{},transparent=false}={}){
  if(!heat?.bounds||!heat.rides)return null;
  const canvas=makeCanvas();canvas.width=width;canvas.height=height;const ctx=canvas.getContext('2d'),view=mapExportViewport(heat.bounds,width,height);
- ctx.fillStyle='#20232b';ctx.fillRect(0,0,width,height);let next=0,completed=0,failed;
+ if(!transparent){ctx.fillStyle='#20232b';ctx.fillRect(0,0,width,height);}let next=0,completed=0,failed;
  // A single, user-visible card view only; no other areas or zoom levels are fetched.
  const images=new Array(view.tiles.length);
- await Promise.all(Array.from({length:Math.min(4,view.tiles.length)},async()=>{while(next<view.tiles.length&&!failed){const i=next++,tile=view.tiles[i];try{images[i]=await loadImage(`https://tile.openstreetmap.org/${tile.z}/${tile.x}/${tile.y}.png`);onProgress(++completed,view.tiles.length);}catch(error){failed=error;}}}));
+ if(!transparent)await Promise.all(Array.from({length:Math.min(4,view.tiles.length)},async()=>{while(next<view.tiles.length&&!failed){const i=next++,tile=view.tiles[i];try{images[i]=await loadImage(`https://tile.openstreetmap.org/${tile.z}/${tile.x}/${tile.y}.png`);onProgress(++completed,view.tiles.length);}catch(error){failed=error;}}}));
  if(failed)throw failed;
- ctx.save();ctx.filter='grayscale(1) brightness(.7)';for(let i=0;i<view.tiles.length;i++){const tile=view.tiles[i];ctx.drawImage(images[i],tile.dx,tile.dy,256,256);}ctx.restore();ctx.filter='none';
+ if(!transparent){ctx.save();ctx.filter='grayscale(1) brightness(.7)';for(let i=0;i<view.tiles.length;i++){const tile=view.tiles[i];ctx.drawImage(images[i],tile.dx,tile.dy,256,256);}ctx.restore();ctx.filter='none';}
  for(const tile of view.tiles){const overlay=makeCanvas();paintRouteTile(overlay,index,field,tile,{makeCanvas});ctx.drawImage(overlay,tile.dx,tile.dy);}
- ctx.fillStyle='rgba(20,22,27,.92)';ctx.fillRect(width-330,height-30,330,30);ctx.fillStyle='#f5f5f7';ctx.font='16px Arial, sans-serif';ctx.textAlign='right';ctx.fillText('© OpenStreetMap contributors',width-10,height-10);ctx.textAlign='left';
+ // The share card places required OSM attribution below the map.
  return canvas;
 }
