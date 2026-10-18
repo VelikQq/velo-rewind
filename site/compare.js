@@ -36,7 +36,14 @@ export function comparisonRows(current,previous,options={}){
  add('Пульс и каденс','Средний пульс из сводок',s=>s.avgHr,'number','уд/мин');
  add('Пульс и каденс','Максимальный пульс в файлах',s=>s.maxHr?.maxHr??null,'number','уд/мин');
  add('Пульс и каденс','Средний каденс из сводок',s=>s.avgCadence,'number','об/мин');
+ const sources={
+  'Самая длинная поездка':s=>s?.longest,'Самая долгая поездка':s=>s?.longestTime,
+  'Максимальная скорость':s=>s?.maxSpeed,'Максимальная средняя скорость':s=>s?.bestAverageActivity,
+  'Максимальная мощность в файлах':s=>s?.maxPower,'Максимальный пульс в файлах':s=>s?.maxHr
+ };
+ for(const row of rows){const get=sources[row.label];if(get){row.currentActivity=finite(row.current)?get(current):null;row.previousActivity=finite(row.previous)?get(p):null;}}
+ for(const seconds of [5,60,300,1200]){const row=rows.find(r=>r.label===`Лучшая мощность за ${seconds===5?'5 секунд':seconds/60+' мин'}`);row.currentActivity=current.intervalResults.find(x=>x.seconds===seconds)?.activity;row.previousActivity=p?.intervalResults.find(x=>x.seconds===seconds)?.activity;}
  const now=ftpValue(current,options.method||'manual',options.currentFTP),before=ftpValue(p,options.method||'manual',options.previousFTP);
- rows.push({group:'FTP',label:options.method==='estimate'?'Ориентир FTP: 95% лучших 20 минут':'FTP, введённый пользователем',current:now,previous:before,kind:'number',unit:'Вт',delta:changeLabel(now,before,'number','Вт')});return rows;
+ rows.push({group:'FTP',label:options.method==='estimate'?'Ориентир FTP: 95% лучших 20 минут':'FTP, введённый пользователем',current:now,previous:before,currentActivity:options.method==='estimate'?current.intervalResults.find(x=>x.seconds===1200)?.activity:null,previousActivity:options.method==='estimate'?p?.intervalResults.find(x=>x.seconds===1200)?.activity:null,kind:'number',unit:'Вт',delta:changeLabel(now,before,'number','Вт')});return rows;
 }
 export function displayValue(value,kind,unit){if(!finite(value))return '—';return kind==='time'?formatDuration(value):(kind==='speed'?speed(value):n(value))+(unit?' '+unit:'');}

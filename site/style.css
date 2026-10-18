@@ -24,3 +24,5 @@ button.month{padding:5px 3px 3px;background:transparent;border:0;border-radius:6
 .brand{display:inline-flex;align-items:center;gap:11px}.brand-mark{display:block;flex:none;width:40px;height:40px}.brand .brand-words{color:var(--text);padding:0;display:block}.brand-words b{color:var(--lime);font-weight:inherit}.brand small{font-size:9px;letter-spacing:1.9px;line-height:1.4}.brand-mark+span{white-space:nowrap}footer .brand-mark{width:30px;height:30px}@media(max-width:640px){.brand{gap:8px}.brand-mark{width:34px;height:34px}.brand small{font-size:8px;letter-spacing:1.2px}.story-top .brand{font-size:18px}}
 
 .share-preview{margin:0 0 35px}.share-preview canvas{display:block;width:min(100%,540px);height:auto;margin:auto;border-radius:12px;border:1px solid var(--border)}#share-status{font-size:14px;letter-spacing:0;color:var(--muted)}.map-controls{justify-content:flex-end}
+
+.activity-link{display:block;width:fit-content;color:var(--lime);font-size:14px;line-height:1.5;margin-top:8px;text-underline-offset:3px}.activity-link:focus-visible{outline:2px solid var(--lime);outline-offset:4px}.interval .activity-link{font-size:13px}

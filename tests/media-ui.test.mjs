@@ -15,6 +15,7 @@ test('folder import renders season media, paginates and revokes URLs on filters 
  globalThis.document={getElementById:id=>{assert.ok(nodes.has(id),id);return nodes.get(id);}};globalThis.window={scrollTo(){}};
  try{
   await import('../site/app.js');await nodes.get('folder').handlers.change({target:{files:[csv,...media]}});
+  assert.match(nodes.get('records').innerHTML,/https:\/\/www\.strava\.com\/activities\/1/);assert.doesNotMatch(nodes.get('records').innerHTML,/activities\/2/);assert.match(nodes.get('compare-rows').innerHTML,/activities\/2/);
   assert.match(html, /class="button primary" for="folder"/);assert.match(html,/media-src blob:/);
   assert.match(nodes.get('media-count').textContent,/25 фото · 1 видео/);assert.equal(created,24);assert.equal(nodes.get('media-more').hidden,false);assert.match(nodes.get('media-grid').innerHTML,/Current ride/);assert.ok(!nodes.get('media-grid').innerHTML.includes('Old ride'));
   nodes.get('media-more').handlers.click();assert.equal(created,26);assert.equal(nodes.get('media-more').hidden,true);assert.match(nodes.get('media-grid').innerHTML,/<video[^>]*controls preload="none"/);
