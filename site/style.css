@@ -46,3 +46,7 @@ button.month{padding:5px 3px 3px;background:transparent;border:0;border-radius:6
 /* Hero: statistics obsession, with a code-native cycling computer illustration. */
 .intro>div:first-child{min-width:0}.intro h1{font-size:clamp(44px,4.8vw,66px);line-height:1.06;letter-spacing:-2.8px}.intro .art{max-width:480px;width:100%;justify-self:center}
 @media(max-width:640px){.intro h1{font-size:clamp(39px,9.2vw,59px);letter-spacing:-1.8px}}
+
+.fun-value.city-name{font-size:clamp(30px,3.5vw,44px);letter-spacing:-1px;overflow-wrap:anywhere}#story-content .story-value.city-name{font-size:clamp(40px,8vw,90px);letter-spacing:-2px;overflow-wrap:anywhere}
+
+.compare-highlight small.change-up{color:#7ee2a8}.compare-highlight small.change-down{color:#ff8a8a}.compare-highlight small.change-same,.compare-highlight small.change-missing{color:var(--muted)}
